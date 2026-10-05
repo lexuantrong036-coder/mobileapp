@@ -121,13 +121,25 @@ class FloatingOverlayService : Service() {
             ACTION_START -> {
                 startForegroundWithNotification()
                 val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, 0) ?: 0
-                val resultData = intent?.getParcelableExtra<Intent>(EXTRA_RESULT_DATA)
+                val resultData = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent?.getParcelableExtra(EXTRA_RESULT_DATA, Intent::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent?.getParcelableExtra<Intent>(EXTRA_RESULT_DATA)
+                }
 
-                if (resultCode != 0 && resultData != null && mediaProjection == null) {
-                    val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-                    mediaProjection = projectionManager.getMediaProjection(resultCode, resultData)
-
-                    initCaptureManager()
+                if (resultCode != 0 && resultData != null) {
+                    try {
+                        if (mediaProjection == null) {
+                            val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                            mediaProjection = projectionManager.getMediaProjection(resultCode, resultData)
+                        }
+                        captureManager?.release()
+                        initCaptureManager()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Lỗi khi lấy MediaProjection", e)
+                        Toast.makeText(this, "Lỗi khởi tạo chụp màn hình: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
                 }
 
                 isRunning = true
