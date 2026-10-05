@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,8 +31,13 @@ jobs:
         working-directory: AppMobile
         run: gradle assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - name: Publish Direct APK Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: app-debug
-          path: AppMobile/app/build/outputs/apk/debug/app-debug.apk
+          tag_name: v1.0.0
+          name: "AI Screen Solver v1.0.0"
+          draft: false
+          prerelease: false
+          files: AppMobile/app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
