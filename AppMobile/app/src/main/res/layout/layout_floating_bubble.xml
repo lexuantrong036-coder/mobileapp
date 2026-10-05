@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/bubbleRoot"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:clickable="true"
+    android:focusable="true">
+
+    <FrameLayout
+        android:id="@+id/bubbleContainer"
+        android:layout_width="54dp"
+        android:layout_height="54dp"
+        android:background="@drawable/bg_bubble">
+
+        <ImageView
+            android:id="@+id/bubbleIcon"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="center"
+            android:contentDescription="@string/app_name"
+            android:src="@drawable/ic_sparkle" />
+
+        <ProgressBar
+            android:id="@+id/bubbleLoading"
+            style="?android:attr/progressBarStyleSmall"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="center"
+            android:indeterminateTint="#00E676"
+            android:visibility="gone" />
+
+    </FrameLayout>
+
+    <!-- Small badge to indicate Auto-Loop mode is active -->
+    <TextView
+        android:id="@+id/tvAutoBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:background="#FF5252"
+        android:paddingStart="4dp"
+        android:paddingTop="1dp"
+        android:paddingEnd="4dp"
+        android:paddingBottom="1dp"
+        android:text="AUTO"
+        android:textColor="#FFFFFF"
+        android:textSize="9sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+</FrameLayout>

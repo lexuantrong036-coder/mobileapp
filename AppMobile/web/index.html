@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Screen Solver (Web Mobile Edition)</title>
+    <style>
+        :root {
+            --bg: #13141F;
+            --surface: #1E1F2E;
+            --surface-variant: #28293D;
+            --primary: #00E676;
+            --text: #FFFFFF;
+            --text-secondary: #A5A7C2;
+            --border: #383A53;
+            --error: #FF5252;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 480px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        header {
+            text-align: center;
+            padding: 12px 0;
+        }
+        h1 {
+            color: var(--primary);
+            font-size: 22px;
+            font-weight: 700;
+        }
+        p.subtitle {
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin-top: 4px;
+        }
+        .card {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .card-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        input, select {
+            width: 100%;
+            padding: 12px;
+            background: var(--surface-variant);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            font-size: 14px;
+            outline: none;
+        }
+        input:focus, select:focus {
+            border-color: var(--primary);
+        }
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            border: none;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: opacity 0.2s;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: #13141F;
+        }
+        .btn-danger {
+            background: var(--error);
+            color: #FFFFFF;
+        }
+        .btn-secondary {
+            background: var(--surface-variant);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .btn:active {
+            opacity: 0.8;
+        }
+        .switch-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .pip-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        /* Hidden canvas & video used for Picture-in-Picture */
+        #displayVideo {
+            width: 100%;
+            max-height: 200px;
+            border-radius: 10px;
+            background: #000;
+            display: none;
+        }
+        #pipCanvas {
+            display: none;
+        }
+        #pipVideo {
+            width: 100%;
+            border-radius: 10px;
+            background: #181926;
+        }
+        .status-badge {
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: var(--surface-variant);
+            font-size: 13px;
+            text-align: center;
+        }
+        .answer-box {
+            background: #192D23;
+            border: 1.5px solid var(--primary);
+            border-radius: 12px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .choice-badge {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--primary);
+        }
+        .answer-text {
+            font-size: 15px;
+            font-weight: 600;
+            color: #FFF;
+        }
+        .explanation-text {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>AI Screen Solver</h1>
+            <p class="subtitle">Chạy trực tiếp trên Chrome Mobile (Cửa sổ nổi PiP)</p>
+        </header>
+
+        <!-- KẾT QUẢ ĐÁP ÁN -->
+        <div id="answerCard" class="card answer-box" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="choice-badge" id="lblChoice">👉 [B]</span>
+                <span id="lblTime" style="font-size: 11px; color: var(--text-secondary);">Vừa xong</span>
+            </div>
+            <div class="answer-text" id="lblAnswer">Đang chờ câu hỏi...</div>
+            <div class="explanation-text" id="lblExplanation"></div>
+        </div>
+
+        <!-- CỬA SỔ NỔI & VIDEO TRÌNH CHIẾU -->
+        <div class="card pip-container">
+            <div class="card-title">Cửa sổ nổi đè lên màn hình</div>
+            <!-- Video này sẽ được bật tính năng Picture-in-Picture để nổi lên mọi app -->
+            <video id="pipVideo" autoplay muted playsinline></video>
+            <video id="displayVideo" autoplay muted playsinline></video>
+            <canvas id="pipCanvas" width="400" height="180"></canvas>
+
+            <button id="btnStartScreen" class="btn btn-primary">
+                1. BẮT ĐẦU CHIA SẺ MÀN HÌNH
+            </button>
+            <button id="btnOpenPip" class="btn btn-secondary" style="display: none;">
+                2. MỞ CỬA SỔ NỔI (PiP)
+            </button>
+            <button id="btnSolveNow" class="btn btn-primary" style="display: none;">
+                🔍 QUÉT & GIẢI NGAY
+            </button>
+        </div>
+
+        <!-- CẤU HÌNH AI -->
+        <div class="card">
+            <div class="card-title">Cấu hình 9router AI</div>
+            <div>
+                <label>API Key 9router:</label>
+                <input type="password" id="txtApiKey" placeholder="sk-..." />
+            </div>
+            <div>
+                <label>Model Vision:</label>
+                <select id="selModel">
+                    <option value="gemini-1.5-flash" selected>gemini-1.5-flash (Nhanh nhất - Khuyên dùng)</option>
+                    <option value="gpt-4o-mini">gpt-4o-mini (Thông minh)</option>
+                    <option value="claude-3-5-sonnet">claude-3-5-sonnet (Logic cao)</option>
+                </select>
+            </div>
+            <div>
+                <label>Base URL:</label>
+                <input type="text" id="txtBaseUrl" value="https://api.9router.com/v1" />
+            </div>
+
+            <div class="switch-row">
+                <div>
+                    <div style="font-weight: 600; font-size: 14px;">Tự động liên tục (Auto-loop)</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Tự giải khi chuyển câu mới (2.5s)</div>
+                </div>
+                <input type="checkbox" id="chkAutoLoop" style="width: 22px; height: 22px;" />
+            </div>
+
+            <div class="switch-row">
+                <div>
+                    <div style="font-weight: 600; font-size: 14px;">Đọc to đáp án (Voice)</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Tự đọc đáp án vào loa/tai nghe</div>
+                </div>
+                <input type="checkbox" id="chkVoice" checked style="width: 22px; height: 22px;" />
+            </div>
+        </div>
+
+        <div id="statusLog" class="status-badge">
+            Sẵn sàng. Nhập API Key rồi nhấn "Bắt đầu chia sẻ màn hình".
+        </div>
+    </div>
+
+    <script>
+        const txtApiKey = document.getElementById('txtApiKey');
+        const selModel = document.getElementById('selModel');
+        const txtBaseUrl = document.getElementById('txtBaseUrl');
+        const chkAutoLoop = document.getElementById('chkAutoLoop');
+        const chkVoice = document.getElementById('chkVoice');
+
+        const btnStartScreen = document.getElementById('btnStartScreen');
+        const btnOpenPip = document.getElementById('btnOpenPip');
+        const btnSolveNow = document.getElementById('btnSolveNow');
+
+        const displayVideo = document.getElementById('displayVideo');
+        const pipCanvas = document.getElementById('pipCanvas');
+        const pipVideo = document.getElementById('pipVideo');
+        const ctx = pipCanvas.getContext('2d');
+
+        const answerCard = document.getElementById('answerCard');
+        const lblChoice = document.getElementById('lblChoice');
+        const lblAnswer = document.getElementById('lblAnswer');
+        const lblExplanation = document.getElementById('lblExplanation');
+        const statusLog = document.getElementById('statusLog');
+
+        let screenStream = null;
+        let isSolving = false;
+        let autoLoopTimer = null;
+        let lastAnswer = "";
+
+        // Tải cấu hình đã lưu
+        txtApiKey.value = localStorage.getItem('9router_key') || '';
+        selModel.value = localStorage.getItem('9router_model') || 'gemini-1.5-flash';
+        txtBaseUrl.value = localStorage.getItem('9router_base') || 'https://api.9router.com/v1';
+
+        function saveConfig() {
+            localStorage.setItem('9router_key', txtApiKey.value.trim());
+            localStorage.setItem('9router_model', selModel.value);
+            localStorage.setItem('9router_base', txtBaseUrl.value.trim());
+        }
+
+        txtApiKey.addEventListener('change', saveConfig);
+        selModel.addEventListener('change', saveConfig);
+        txtBaseUrl.addEventListener('change', saveConfig);
+
+        // Vẽ nội dung lên Canvas của PiP Window
+        function drawPipHUD(choice, text, subtext = "") {
+            ctx.fillStyle = "#1E1F2E";
+            ctx.fillRect(0, 0, pipCanvas.width, pipCanvas.height);
+
+            // Viền neon
+            ctx.strokeStyle = "#00E676";
+            ctx.lineWidth = 4;
+            ctx.strokeRect(2, 2, pipCanvas.width - 4, pipCanvas.height - 4);
+
+            // Chữ cái đáp án lớn
+            ctx.fillStyle = "#00E676";
+            ctx.font = "bold 42px sans-serif";
+            ctx.fillText(choice || "AI", 16, 54);
+
+            // Nội dung ngắn
+            ctx.fillStyle = "#FFFFFF";
+            ctx.font = "bold 20px sans-serif";
+            const cleanText = (text || "Đang chờ câu hỏi...").substring(0, 24);
+            ctx.fillText(cleanText, 16, 100);
+
+            // Trạng thái phụ
+            ctx.fillStyle = "#A5A7C2";
+            ctx.font = "14px sans-serif";
+            ctx.fillText(subtext || "Chạm nút để giải lại", 16, 140);
+        }
+
+        drawPipHUD("AI", "Sẵn sàng quét");
+
+        // Kết nối Canvas stream sang PiP video
+        const canvasStream = pipCanvas.captureStream(10);
+        pipVideo.srcObject = canvasStream;
+
+        // 1. Chia sẻ màn hình
+        btnStartScreen.addEventListener('click', async () => {
+            saveConfig();
+            if (!txtApiKey.value) {
+                alert("Vui lòng nhập API Key 9router trước!");
+                return;
+            }
+
+            try {
+                statusLog.innerText = "Đang xin quyền quay màn hình...";
+                screenStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { cursor: "never" }
+                });
+
+                displayVideo.srcObject = screenStream;
+                btnStartScreen.style.display = "none";
+                btnOpenPip.style.display = "block";
+                btnSolveNow.style.display = "block";
+                statusLog.innerText = "Đã kết nối màn hình! Hãy bấm 'Mở cửa sổ nổi (PiP)'.";
+
+                // Tự động yêu cầu mở PiP
+                setTimeout(openPictureInPicture, 500);
+
+                // Lắng nghe khi người dùng tắt chia sẻ
+                screenStream.getVideoTracks()[0].onended = () => {
+                    clearInterval(autoLoopTimer);
+                    location.reload();
+                };
+
+                if (chkAutoLoop.checked) {
+                    startAutoLoop();
+                }
+            } catch (err) {
+                console.error(err);
+                statusLog.innerText = "Lỗi cấp quyền: " + err.message;
+            }
+        });
+
+        // 2. Mở Picture-in-Picture
+        async function openPictureInPicture() {
+            try {
+                if (document.pictureInPictureElement) {
+                    await document.exitPictureInPicture();
+                }
+                await pipVideo.play();
+                await pipVideo.requestPictureInPicture();
+                statusLog.innerText = "Cửa sổ nổi đã mở! Bạn có thể chuyển sang app bài thi.";
+            } catch (err) {
+                console.error(err);
+                alert("Trình duyệt không hỗ trợ PiP hoặc cần tương tác người dùng: " + err.message);
+            }
+        }
+
+        btnOpenPip.addEventListener('click', openPictureInPicture);
+        btnSolveNow.addEventListener('click', () => triggerSolve());
+
+        chkAutoLoop.addEventListener('change', () => {
+            if (chkAutoLoop.checked) {
+                startAutoLoop();
+            } else {
+                clearInterval(autoLoopTimer);
+                autoLoopTimer = null;
+                statusLog.innerText = "Đã tắt tự động quét.";
+            }
+        });
+
+        function startAutoLoop() {
+            clearInterval(autoLoopTimer);
+            autoLoopTimer = setInterval(() => {
+                if (!isSolving && screenStream) {
+                    triggerSolve(true);
+                }
+            }, 3000);
+            statusLog.innerText = "Đang chạy tự động quét (3s/lần)...";
+        }
+
+        // 3. Chụp frame màn hình và gọi 9router Vision API
+        async function triggerSolve(isAuto = false) {
+            if (isSolving || !screenStream) return;
+            isSolving = true;
+
+            drawPipHUD("⏳", "Đang phân tích...", "Đợi AI trả lời");
+            statusLog.innerText = "Đang chụp màn hình và gửi AI...";
+
+            try {
+                // Tạo frame chụp màn hình
+                const captureCanvas = document.createElement('canvas');
+                captureCanvas.width = displayVideo.videoWidth || 1280;
+                captureCanvas.height = displayVideo.videoHeight || 720;
+                const cctx = captureCanvas.getContext('2d');
+                cctx.drawImage(displayVideo, 0, 0, captureCanvas.width, captureCanvas.height);
+
+                // Nén JPEG
+                const base64Data = captureCanvas.toDataURL('image/jpeg', 0.7);
+
+                // Gọi 9router
+                const apiKey = txtApiKey.value.trim();
+                const model = selModel.value;
+                let baseUrl = txtBaseUrl.value.trim().replace(/\/+$/, '');
+                if (!baseUrl.endsWith('/chat/completions')) {
+                    baseUrl += '/chat/completions';
+                }
+
+                const response = await fetch(baseUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: model,
+                        temperature: 0.1,
+                        max_tokens: 180,
+                        messages: [
+                            {
+                                role: "system",
+                                content: `Bạn là trợ lý giải trắc nghiệm siêu tốc từ ảnh chụp màn hình. Hãy quan sát ảnh, đọc câu hỏi và các lựa chọn (A, B, C, D hoặc Đúng/Sai). Trả về duy nhất JSON: {"choice": "A/B/C/D", "text": "tóm tắt đáp án dưới 8 từ", "explanation": "lý do 1 câu"}`
+                            },
+                            {
+                                role: "user",
+                                content: [
+                                    { type: "text", text: "Tìm câu hỏi và đưa ra đáp án đúng nhất." },
+                                    { type: "image_url", image_url: { url: base64Data } }
+                                ]
+                            }
+                        ]
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ` + await response.text());
+                }
+
+                const data = await response.json();
+                const content = data.choices[0].message.content;
+                let parsed = { choice: "!", text: "Không rõ", explanation: content };
+
+                try {
+                    const cleanJson = content.replace(/```json/g, '').replace(/```/g, '').trim();
+                    parsed = JSON.parse(cleanJson);
+                } catch (e) {
+                    const match = content.match(/\b([A-D])\b/);
+                    if (match) parsed.choice = match[1];
+                    parsed.text = content.substring(0, 30);
+                }
+
+                // Cập nhật PiP HUD
+                drawPipHUD(`👉 [${parsed.choice}]`, parsed.text, parsed.explanation.substring(0, 30));
+
+                // Cập nhật giao diện chính
+                answerCard.style.display = "flex";
+                lblChoice.innerText = `👉 [${parsed.choice}]`;
+                lblAnswer.innerText = parsed.text;
+                lblExplanation.innerText = parsed.explanation;
+                statusLog.innerText = `Xong: Đáp án [${parsed.choice}] - ${parsed.text}`;
+
+                // Đọc to nếu bật voice
+                if (chkVoice.checked && parsed.choice !== "!") {
+                    const speechText = `Đáp án ${parsed.choice}: ${parsed.text}`;
+                    if (speechText !== lastAnswer) {
+                        lastAnswer = speechText;
+                        const utter = new SpeechSynthesisUtterance(speechText);
+                        utter.lang = 'vi-VN';
+                        window.speechSynthesis.speak(utter);
+                    }
+                }
+
+            } catch (err) {
+                console.error(err);
+                drawPipHUD("❌", "Lỗi phân tích", err.message.substring(0, 25));
+                statusLog.innerText = "Lỗi: " + err.message;
+            } finally {
+                isSolving = false;
+            }
+        }
+    </script>
+</body>
+</html>

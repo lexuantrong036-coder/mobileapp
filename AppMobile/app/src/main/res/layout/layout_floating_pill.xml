@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/pillRoot"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_floating_pill"
+    android:elevation="8dp"
+    android:orientation="vertical"
+    android:padding="8dp">
+
+    <!-- Header / Main compact row -->
+    <LinearLayout
+        android:id="@+id/pillMainRow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <!-- Choice Badge: [A], [B], [C], [D] -->
+        <TextView
+            android:id="@+id/tvChoiceBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="#00E676"
+            android:paddingStart="8dp"
+            android:paddingTop="3dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="3dp"
+            android:text="👉 [B]"
+            android:textColor="#1E1E2E"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <!-- Short Answer Text -->
+        <TextView
+            android:id="@+id/tvAnswerText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:maxWidth="220dp"
+            android:text="Thủ đô Hà Nội"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <!-- Expand / Collapse Button -->
+        <ImageView
+            android:id="@+id/btnExpand"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginStart="6dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Xem giải thích"
+            android:padding="4dp"
+            android:src="@drawable/ic_expand" />
+
+        <!-- Close Button -->
+        <ImageView
+            android:id="@+id/btnClosePill"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginStart="4dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Đóng"
+            android:padding="4dp"
+            android:src="@drawable/ic_close" />
+
+    </LinearLayout>
+
+    <!-- Expandable explanation section -->
+    <LinearLayout
+        android:id="@+id/layoutExplanation"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:maxWidth="260dp"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0.5dp"
+            android:layout_marginBottom="4dp"
+            android:background="#4F5272" />
+
+        <TextView
+            android:id="@+id/tvExplanationText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Hà Nội là thủ đô của Việt Nam."
+            android:textColor="#C5C7DE"
+            android:textSize="12sp" />
+
+    </LinearLayout>
+
+</LinearLayout>

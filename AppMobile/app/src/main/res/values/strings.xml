@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">AI Screen Solver</string>
+    <string name="notification_channel_name">Dịch vụ Trợ lý Nổi</string>
+    <string name="notification_channel_desc">Duy trì cửa sổ nổi và khả năng quét màn hình</string>
+    <string name="notification_title">Trợ lý AI đang hoạt động</string>
+    <string name="notification_text">Chạm vào bong bóng trên màn hình để giải câu hỏi</string>
+</resources>
