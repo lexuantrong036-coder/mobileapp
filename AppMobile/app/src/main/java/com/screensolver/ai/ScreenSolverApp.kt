@@ -56,7 +56,6 @@ class ScreenCaptureManager(
 
     private fun setupVirtualDisplay() {
         try {
-            // Android 14 (API 34) BẮT BUỘC phải đăng ký Callback trước khi gọi createVirtualDisplay
             mediaProjection.registerCallback(object : MediaProjection.Callback() {
                 override fun onStop() {
                     Log.d(TAG, "MediaProjection đã dừng")
@@ -71,7 +70,6 @@ class ScreenCaptureManager(
                 2
             )
 
-            // Lắng nghe khung hình mới liên tục để luôn có sẵn Bitmap mới nhất
             imageReader?.setOnImageAvailableListener({ reader ->
                 try {
                     val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
@@ -132,9 +130,6 @@ class ScreenCaptureManager(
         }
     }
 
-    /**
-     * Chụp frame màn hình hiện tại. Nếu chưa có frame thì đợi tối đa 1.5 giây.
-     */
     suspend fun captureScreen(): Bitmap? = withContext(Dispatchers.Default) {
         for (i in 0..15) {
             synchronized(bitmapLock) {
@@ -168,9 +163,6 @@ class ScreenCaptureManager(
         null
     }
 
-    /**
-     * Nén Bitmap thành chuỗi Base64 JPEG để gửi lên 9router Vision API.
-     */
     fun compressAndEncodeBase64(
         bitmap: Bitmap,
         maxDimension: Int = 1280,
