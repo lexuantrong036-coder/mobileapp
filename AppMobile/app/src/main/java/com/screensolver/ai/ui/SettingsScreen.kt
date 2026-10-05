@@ -1,11 +1,12 @@
 package com.screensolver.ai.ui
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -17,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -39,18 +41,21 @@ fun SettingsScreen(
     onRequestOverlayPermission: () -> Unit,
     onToggleService: () -> Unit
 ) {
+    val context = LocalContext.current
+
     var baseUrl by remember(config.baseUrl) { mutableStateOf(config.baseUrl) }
     var apiKey by remember(config.apiKey) { mutableStateOf(config.apiKey) }
     var selectedModel by remember(config.model) { mutableStateOf(config.model) }
-    var customModel by remember { mutableStateOf("") }
     var isAutoLoop by remember(config.isAutoLoopEnabled) { mutableStateOf(config.isAutoLoopEnabled) }
     var autoInterval by remember(config.autoIntervalSeconds) { mutableStateOf(config.autoIntervalSeconds) }
     var isApiKeyVisible by remember { mutableStateOf(false) }
 
     val presetModels = listOf(
-        "gemini-1.5-flash" to "Nhanh nhất (Gợi ý)",
-        "gpt-4o-mini" to "Thông minh & Ổn định",
-        "claude-3-5-sonnet" to "Logic phức tạp"
+        "gemini-1.5-flash" to "Google Gemini 1.5 Flash (Siêu nhanh, miễn phí)",
+        "gemini-1.5-pro" to "Google Gemini 1.5 Pro (Tư duy cao cấp, giải đề khó)",
+        "gemini-2.0-flash-exp" to "Google Gemini 2.0 Flash (Thế hệ mới nhất)",
+        "gemini-3.8-flash-high" to "Gemini 3.8 Flash High (9router Gateway)",
+        "gpt-4o-mini" to "OpenAI GPT-4o Mini (Thông minh & Ổn định)"
     )
 
     fun currentConfig() = AiConfig(
@@ -72,7 +77,7 @@ fun SettingsScreen(
                             color = NeonGreen
                         )
                         Text(
-                            text = "Trợ lý giải trắc nghiệm nổi qua 9router",
+                            text = "Google Gemini & 9router Trợ lý màn hình",
                             style = MaterialTheme.typography.labelSmall,
                             color = TextSecondary
                         )
@@ -130,7 +135,65 @@ fun SettingsScreen(
         ) {
             Spacer(modifier = Modifier.height(4.dp))
 
-            // CARD 1: CẤU HÌNH 9ROUTER
+            // CARD: HƯỚNG DẪN ĐĂNG NHẬP GOOGLE LẤY KEY MIỄN PHÍ
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.AccountCircle,
+                            contentDescription = null,
+                            tint = NeonGreen,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Đăng nhập Google lấy Key (Miễn phí 100%)",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TextPrimary
+                        )
+                    }
+
+                    Text(
+                        text = "Bạn chỉ cần đăng nhập tài khoản Google trên trang Google AI Studio và bấm 'Create API key' để lấy key dùng miễn phí cho các model Gemini 1.5, 2.0 Pro/Flash.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+
+                    Button(
+                        onClick = {
+                            val intent = Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://aistudio.google.com/app/apikey")
+                            )
+                            context.startActivity(intent)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.OpenInBrowser,
+                            contentDescription = null,
+                            tint = DarkBackground
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "MỞ GOOGLE AI STUDIO LẤY KEY",
+                            color = DarkBackground,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            // CARD: CẤU HÌNH API
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = DarkSurface),
@@ -140,9 +203,7 @@ fun SettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Default.VpnKey,
                             contentDescription = null,
@@ -151,37 +212,23 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Cấu hình 9router AI",
+                            text = "Khóa API & Máy chủ",
                             style = MaterialTheme.typography.titleMedium
                         )
                     }
 
-                    // Base URL
-                    OutlinedTextField(
-                        value = baseUrl,
-                        onValueChange = {
-                            baseUrl = it
-                            onSaveConfig(currentConfig())
-                        },
-                        label = { Text("Base URL (OpenAI-compatible)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = NeonGreen,
-                            unfocusedBorderColor = BorderColor,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        )
-                    )
-
-                    // API Key
+                    // API Key Input
                     OutlinedTextField(
                         value = apiKey,
                         onValueChange = {
                             apiKey = it
+                            // Tự động nhận diện nếu người dùng dán key Google (AIzaSy...)
+                            if (it.trim().startsWith("AIzaSy") && (baseUrl.contains("9router") || baseUrl.isBlank())) {
+                                baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai"
+                            }
                             onSaveConfig(currentConfig())
                         },
-                        label = { Text("9router API Key") },
+                        label = { Text("API Key (Google Gemini hoặc 9router)") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         visualTransformation = if (isApiKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -203,7 +250,79 @@ fun SettingsScreen(
                         )
                     )
 
-                    // Model Selection
+                    // Phím chọn nhanh Base URL
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai"
+                                onSaveConfig(currentConfig())
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = ButtonDefaults.outlinedButtonBorder.copy(
+                                brush = androidx.compose.ui.graphics.SolidColor(
+                                    if (baseUrl.contains("googleapis")) NeonGreen else BorderColor
+                                )
+                            )
+                        ) {
+                            Text("Google Official", fontSize = 11.sp, color = TextPrimary)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                baseUrl = "https://api.9router.com/v1"
+                                onSaveConfig(currentConfig())
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = ButtonDefaults.outlinedButtonBorder.copy(
+                                brush = androidx.compose.ui.graphics.SolidColor(
+                                    if (baseUrl.contains("9router")) NeonGreen else BorderColor
+                                )
+                            )
+                        ) {
+                            Text("9router Cloud", fontSize = 11.sp, color = TextPrimary)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                baseUrl = "http://localhost:8080/v1"
+                                onSaveConfig(currentConfig())
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = ButtonDefaults.outlinedButtonBorder.copy(
+                                brush = androidx.compose.ui.graphics.SolidColor(
+                                    if (baseUrl.contains("localhost")) NeonGreen else BorderColor
+                                )
+                            )
+                        ) {
+                            Text("Localhost", fontSize = 11.sp, color = TextPrimary)
+                        }
+                    }
+
+                    // Base URL Input
+                    OutlinedTextField(
+                        value = baseUrl,
+                        onValueChange = {
+                            baseUrl = it
+                            onSaveConfig(currentConfig())
+                        },
+                        label = { Text("Base URL") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NeonGreen,
+                            unfocusedBorderColor = BorderColor,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        )
+                    )
+
+                    // Chọn Model
                     Text(
                         text = "Chọn Model:",
                         style = MaterialTheme.typography.bodyMedium,
@@ -231,7 +350,7 @@ fun SettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Column {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = modelId,
                                         fontWeight = FontWeight.Bold,
@@ -254,7 +373,25 @@ fun SettingsScreen(
                         }
                     }
 
-                    // Test Connection Button
+                    // Nhập Model tùy chỉnh
+                    OutlinedTextField(
+                        value = selectedModel,
+                        onValueChange = {
+                            selectedModel = it
+                            onSaveConfig(currentConfig())
+                        },
+                        label = { Text("Hoặc nhập tên Model bất kỳ") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NeonGreen,
+                            unfocusedBorderColor = BorderColor,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        )
+                    )
+
+                    // Nút Kiểm tra kết nối
                     Button(
                         onClick = { onTestConnection(currentConfig()) },
                         enabled = !isTestingConnection && apiKey.isNotBlank(),
@@ -268,7 +405,7 @@ fun SettingsScreen(
                                 strokeWidth = 2.dp
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Đang kiểm tra...")
+                            Text("Đang kiểm tra kết nối...")
                         } else {
                             Icon(Icons.Default.Speed, contentDescription = null, tint = NeonGreen)
                             Spacer(modifier = Modifier.width(8.dp))
@@ -286,7 +423,7 @@ fun SettingsScreen(
                 }
             }
 
-            // CARD 2: CHẾ ĐỘ GIẢI
+            // CARD: CHẾ ĐỘ GIẢI
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = DarkSurface),
@@ -296,9 +433,7 @@ fun SettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Default.TouchApp,
                             contentDescription = null,
@@ -312,11 +447,6 @@ fun SettingsScreen(
                         )
                     }
 
-                    Text(
-                        text = "• Bấm nút nổi: Nhấp bong bóng để quét màn hình và hiện đáp án ngay.\n• Giữ nút nổi: Bật/tắt nhanh chế độ tự động.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -324,12 +454,12 @@ fun SettingsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Tự động liên tục (Auto-loop)",
+                                text = "Tự động quét liên tục",
                                 fontWeight = FontWeight.SemiBold,
                                 color = TextPrimary
                             )
                             Text(
-                                text = "Tự nhận diện khi có câu hỏi mới",
+                                text = "Tự giải khi chuyển câu mới",
                                 style = MaterialTheme.typography.labelSmall
                             )
                         }
@@ -368,7 +498,7 @@ fun SettingsScreen(
                 }
             }
 
-            // CARD 3: QUYỀN HỆ THỐNG
+            // CARD: QUYỀN HỆ THỐNG
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = DarkSurface),
@@ -378,9 +508,7 @@ fun SettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Default.Security,
                             contentDescription = null,
