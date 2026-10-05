@@ -34,8 +34,8 @@ jobs:
       - name: Publish Direct APK Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0
-          name: "AI Screen Solver v1.0.0"
+          tag_name: v1.0.1
+          name: "AI Screen Solver v1.0.1 (Sửa lỗi chụp màn hình)"
           draft: false
           prerelease: false
           files: AppMobile/app/build/outputs/apk/debug/app-debug.apk
