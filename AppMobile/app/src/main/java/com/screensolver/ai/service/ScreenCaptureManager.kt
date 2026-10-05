@@ -9,6 +9,7 @@ import android.media.Image
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.util.Base64
 import android.util.Log
@@ -33,20 +34,50 @@ class ScreenCaptureManager(
 
     private var imageReader: ImageReader? = null
     private var virtualDisplay: VirtualDisplay? = null
-    private val backgroundHandler = Handler(Looper.getMainLooper())
+
+    private var handlerThread: HandlerThread? = null
+    private var backgroundHandler: Handler? = null
+
+    @Volatile
+    private var latestBitmap: Bitmap? = null
+    private val bitmapLock = Any()
 
     init {
+        initBackgroundThread()
         setupVirtualDisplay()
+    }
+
+    private fun initBackgroundThread() {
+        handlerThread = HandlerThread("ScreenCaptureThread").apply {
+            start()
+            backgroundHandler = Handler(looper)
+        }
     }
 
     private fun setupVirtualDisplay() {
         try {
+            mediaProjection.registerCallback(object : MediaProjection.Callback() {
+                override fun onStop() {
+                    Log.d(TAG, "MediaProjection đã dừng")
+                    release()
+                }
+            }, backgroundHandler ?: Handler(Looper.getMainLooper()))
+
             imageReader = ImageReader.newInstance(
                 screenWidth,
                 screenHeight,
                 PixelFormat.RGBA_8888,
                 2
             )
+
+            imageReader?.setOnImageAvailableListener({ reader ->
+                try {
+                    val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
+                    processImageToBitmap(image)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Lỗi trong OnImageAvailableListener", e)
+                }
+            }, backgroundHandler)
 
             virtualDisplay = mediaProjection.createVirtualDisplay(
                 VIRTUAL_DISPLAY_NAME,
@@ -58,32 +89,13 @@ class ScreenCaptureManager(
                 null,
                 backgroundHandler
             )
-            Log.d(TAG, "Đã khởi tạo VirtualDisplay (${screenWidth}x${screenHeight} @ ${screenDensity}dpi)")
+            Log.d(TAG, "Đã khởi tạo VirtualDisplay thành công (${screenWidth}x${screenHeight} @ ${screenDensity}dpi)")
         } catch (e: Exception) {
-            Log.e(TAG, "Lỗi khi tạo VirtualDisplay", e)
+            Log.e(TAG, "Lỗi nghiêm trọng khi tạo VirtualDisplay", e)
         }
     }
 
-    /**
-     * Chụp frame màn hình hiện tại thành đối tượng Bitmap.
-     * Xử lý cẩn thận row padding của ImageReader để tránh biến dạng hình ảnh.
-     */
-    suspend fun captureScreen(): Bitmap? = withContext(Dispatchers.Default) {
-        val reader = imageReader ?: return@withContext null
-
-        // Chờ 1 nhịp ngắn để ImageReader sẵn sàng có frame mới
-        var image: Image? = null
-        for (attempt in 0..3) {
-            image = reader.acquireLatestImage()
-            if (image != null) break
-            delay(40)
-        }
-
-        if (image == null) {
-            Log.w(TAG, "Không thể lấy frame từ ImageReader (image == null)")
-            return@withContext null
-        }
-
+    private fun processImageToBitmap(image: Image) {
         try {
             val planes = image.planes
             val buffer = planes[0].buffer
@@ -91,7 +103,6 @@ class ScreenCaptureManager(
             val rowStride = planes[0].rowStride
             val rowPadding = rowStride - pixelStride * screenWidth
 
-            // Tạo bitmap tạm bao gồm cả padding
             val fullBitmap = Bitmap.createBitmap(
                 screenWidth + rowPadding / pixelStride,
                 screenHeight,
@@ -99,7 +110,6 @@ class ScreenCaptureManager(
             )
             fullBitmap.copyPixelsFromBuffer(buffer)
 
-            // Cắt phần ảnh chuẩn (loại bỏ padding)
             val cleanBitmap = if (rowPadding > 0) {
                 val cropped = Bitmap.createBitmap(fullBitmap, 0, 0, screenWidth, screenHeight)
                 fullBitmap.recycle()
@@ -108,19 +118,51 @@ class ScreenCaptureManager(
                 fullBitmap
             }
 
-            cleanBitmap
+            synchronized(bitmapLock) {
+                val old = latestBitmap
+                latestBitmap = cleanBitmap
+                old?.recycle()
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Lỗi trích xuất Bitmap từ ImageReader", e)
-            null
+            Log.e(TAG, "Lỗi trích xuất Bitmap từ Image", e)
         } finally {
             image.close()
         }
     }
 
-    /**
-     * Nén Bitmap thành chuỗi Base64 JPEG để gửi lên 9router Vision API.
-     * Tự động resize ảnh về maxDimension (1280px) để tối ưu dung lượng và tốc độ mạng.
-     */
+    suspend fun captureScreen(): Bitmap? = withContext(Dispatchers.Default) {
+        for (i in 0..15) {
+            synchronized(bitmapLock) {
+                latestBitmap?.let { bmp ->
+                    if (!bmp.isRecycled) {
+                        return@withContext bmp.copy(bmp.config ?: Bitmap.Config.ARGB_8888, false)
+                    }
+                }
+            }
+            delay(100)
+        }
+
+        val reader = imageReader ?: return@withContext null
+        try {
+            val image = reader.acquireLatestImage()
+            if (image != null) {
+                processImageToBitmap(image)
+                synchronized(bitmapLock) {
+                    latestBitmap?.let { bmp ->
+                        if (!bmp.isRecycled) {
+                            return@withContext bmp.copy(bmp.config ?: Bitmap.Config.ARGB_8888, false)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Fallback acquireLatestImage thất bại", e)
+        }
+
+        Log.w(TAG, "Không thể lấy frame màn hình (timeout sau 1.5s)")
+        null
+    }
+
     fun compressAndEncodeBase64(
         bitmap: Bitmap,
         maxDimension: Int = 1280,
@@ -128,7 +170,6 @@ class ScreenCaptureManager(
     ): String {
         var processedBitmap = bitmap
 
-        // Resize nếu kích thước vượt quá maxDimension
         val currentMax = max(bitmap.width, bitmap.height)
         if (currentMax > maxDimension) {
             val scale = maxDimension.toFloat() / currentMax
@@ -150,11 +191,20 @@ class ScreenCaptureManager(
 
     fun release() {
         try {
+            synchronized(bitmapLock) {
+                latestBitmap?.recycle()
+                latestBitmap = null
+            }
             virtualDisplay?.release()
             virtualDisplay = null
             imageReader?.close()
             imageReader = null
-            Log.d(TAG, "Đã giải phóng VirtualDisplay và ImageReader")
+
+            handlerThread?.quitSafely()
+            handlerThread = null
+            backgroundHandler = null
+
+            Log.d(TAG, "Đã giải phóng toàn bộ tài nguyên ScreenCaptureManager")
         } catch (e: Exception) {
             Log.e(TAG, "Lỗi giải phóng ScreenCaptureManager", e)
         }
