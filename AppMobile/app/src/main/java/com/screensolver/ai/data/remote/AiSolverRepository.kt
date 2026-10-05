@@ -17,9 +17,9 @@ import java.util.regex.Pattern
 
 class AiSolverRepository(
     private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(8, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .writeTimeout(15, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(25, TimeUnit.SECONDS)
+        .writeTimeout(20, TimeUnit.SECONDS)
         .build(),
     private val gson: Gson = Gson()
 ) {
@@ -39,7 +39,7 @@ Hãy chọn phương án đúng nhất và trả về DUY NHẤT một chuỗi J
     }
 
     /**
-     * Gửi ảnh chụp màn hình dạng Base64 lên 9router API để giải câu hỏi
+     * Gửi ảnh chụp màn hình dạng Base64 lên Google Gemini hoặc 9router API để giải câu hỏi
      */
     suspend fun solveScreen(
         config: AiConfig,
@@ -47,17 +47,16 @@ Hãy chọn phương án đúng nhất và trả về DUY NHẤT một chuỗi J
     ): Result<SolverResult> = withContext(Dispatchers.IO) {
         try {
             if (config.apiKey.isBlank()) {
-                return@withContext Result.failure(IllegalArgumentException("Chưa cấu hình API Key 9router. Vui lòng vào Cài đặt để nhập."))
+                return@withContext Result.failure(IllegalArgumentException("Chưa có API Key. Vui lòng vào Cài đặt để nhập."))
             }
 
-            val endpoint = resolveEndpoint(config.baseUrl)
+            val endpoint = resolveEndpoint(config.baseUrl, config.apiKey)
             Log.d(TAG, "Gửi ảnh tới $endpoint với model ${config.model}")
 
-            // Xây dựng JSON payload chuẩn OpenAI
             val requestJson = JsonObject().apply {
                 addProperty("model", config.model)
                 addProperty("temperature", 0.1)
-                addProperty("max_tokens", 180)
+                addProperty("max_tokens", 200)
 
                 val messagesArray = com.google.gson.JsonArray()
 
@@ -67,7 +66,7 @@ Hãy chọn phương án đúng nhất và trả về DUY NHẤT một chuỗi J
                     addProperty("content", SYSTEM_PROMPT)
                 })
 
-                // User message có Vision Image
+                // User message có ảnh
                 val userContentArray = com.google.gson.JsonArray().apply {
                     add(JsonObject().apply {
                         addProperty("type", "text")
@@ -92,7 +91,7 @@ Hãy chọn phương án đúng nhất và trả về DUY NHẤT một chuỗi J
             val requestBody = requestJson.toString().toRequestBody(JSON_MEDIA_TYPE)
             val request = Request.Builder()
                 .url(endpoint)
-                .addHeader("Authorization", "Bearer ${config.apiKey}")
+                .addHeader("Authorization", "Bearer ${config.apiKey.trim()}")
                 .addHeader("Content-Type", "application/json")
                 .post(requestBody)
                 .build()
@@ -103,11 +102,11 @@ Hãy chọn phương án đúng nhất và trả về DUY NHẤT một chuỗi J
                 if (!response.isSuccessful) {
                     val errorMsg = when (response.code) {
                         401 -> "API Key không hợp lệ hoặc hết hạn (Mã 401)"
-                        404 -> "Model '${config.model}' không tồn tại hoặc sai URL (Mã 404)"
-                        429 -> "Hết hạn mức hoặc bị giới hạn tốc độ yêu cầu (Mã 429)"
-                        else -> "Lỗi từ máy chủ 9router: ${response.code} - ${response.message}"
+                        404 -> "Model '${config.model}' không tìm thấy trên server này (Mã 404)"
+                        429 -> "Đạt giới hạn tốc độ/quota. Hãy thử lại sau vài giây (Mã 429)"
+                        else -> "Lỗi phản hồi [${response.code}]: ${response.message}\n$bodyString"
                     }
-                    Log.e(TAG, "Lỗi API: $errorMsg | Body: $bodyString")
+                    Log.e(TAG, "Lỗi API: $errorMsg")
                     return@withContext Result.failure(Exception(errorMsg))
                 }
 
@@ -115,13 +114,13 @@ Hãy chọn phương án đúng nhất và trả về DUY NHẤT một chuỗi J
                 Result.success(parsedResult)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Ngoại lệ khi gọi 9router API", e)
+            Log.e(TAG, "Ngoại lệ khi gọi AI API", e)
             Result.failure(e)
         }
     }
 
     /**
-     * Kiểm tra nhanh API Key và Model mà không cần tải ảnh lên
+     * Kiểm tra nhanh API Key và Model
      */
     suspend fun testConnection(config: AiConfig): Result<String> = withContext(Dispatchers.IO) {
         try {
@@ -129,7 +128,7 @@ Hãy chọn phương án đúng nhất và trả về DUY NHẤT một chuỗi J
                 return@withContext Result.failure(IllegalArgumentException("Vui lòng nhập API Key"))
             }
 
-            val endpoint = resolveEndpoint(config.baseUrl)
+            val endpoint = resolveEndpoint(config.baseUrl, config.apiKey)
             val requestJson = JsonObject().apply {
                 addProperty("model", config.model)
                 addProperty("max_tokens", 10)
@@ -144,7 +143,7 @@ Hãy chọn phương án đúng nhất và trả về DUY NHẤT một chuỗi J
 
             val request = Request.Builder()
                 .url(endpoint)
-                .addHeader("Authorization", "Bearer ${config.apiKey}")
+                .addHeader("Authorization", "Bearer ${config.apiKey.trim()}")
                 .addHeader("Content-Type", "application/json")
                 .post(requestJson.toString().toRequestBody(JSON_MEDIA_TYPE))
                 .build()
@@ -162,9 +161,6 @@ Hãy chọn phương án đúng nhất và trả về DUY NHẤT một chuỗi J
         }
     }
 
-    /**
-     * Bóc tách JSON từ phản hồi Chat Completion
-     */
     private fun parseChatCompletionResponse(responseBody: String): SolverResult {
         try {
             val root = JsonParser.parseString(responseBody).asJsonObject
@@ -177,7 +173,6 @@ Hãy chọn phương án đúng nhất và trả về DUY NHẤT một chuỗi J
             val message = firstChoice.getAsJsonObject("message")
             val content = message?.get("content")?.asString.orEmpty().trim()
 
-            // Làm sạch nội dung JSON nếu model bọc trong ```json ... ```
             val cleanedJson = cleanJsonString(content)
 
             return try {
@@ -193,8 +188,7 @@ Hãy chọn phương án đúng nhất và trả về DUY NHẤT một chuỗi J
                     rawContent = content
                 )
             } catch (e: Exception) {
-                // Fallback nếu model trả về text thường thay vì JSON
-                Log.w(TAG, "Không thể parse JSON, sử dụng heuristic fallback: $content")
+                Log.w(TAG, "Không thể parse JSON, fallback: $content")
                 val choice = extractChoiceFromText(content)
                 SolverResult(
                     choice = choice,
@@ -238,8 +232,29 @@ Hãy chọn phương án đúng nhất và trả về DUY NHẤT một chuỗi J
         return "OK"
     }
 
-    private fun resolveEndpoint(baseUrl: String): String {
-        val clean = baseUrl.trim().trimEnd('/')
+    /**
+     * Tự động nhận diện endpoint:
+     * - Nếu là Key Google Gemini (bắt đầu bằng AIzaSy...): Tự động trỏ sang Google AI Studio OpenAI endpoint.
+     * - Nếu là localhost / IP / domain tùy chỉnh: Cho phép và chuẩn hóa URL.
+     */
+    private fun resolveEndpoint(baseUrl: String, apiKey: String): String {
+        val trimmedKey = apiKey.trim()
+        val trimmedUrl = baseUrl.trim().trimEnd('/')
+
+        // Nếu người dùng dùng key Google chính thức (AIzaSy...) và chưa đổi URL hoặc đang để mặc định
+        if (trimmedKey.startsWith("AIzaSy") && (trimmedUrl.contains("9router") || trimmedUrl.isBlank())) {
+            return "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+        }
+
+        var clean = trimmedUrl
+        if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
+            clean = if (clean.contains("localhost") || clean.contains("127.0.0.1") || clean.contains("10.0.2.2")) {
+                "http://$clean"
+            } else {
+                "https://$clean"
+            }
+        }
+
         return if (clean.endsWith("/chat/completions")) {
             clean
         } else {
